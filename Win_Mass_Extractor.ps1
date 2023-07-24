@@ -1,7 +1,45 @@
 # Win_Mass_Extractor - PowerShell Script to Simplify Extracting Multiple ZIP Archives
 
 # Function to extract ZIP files using [System.IO.Compression.ZipFile] (PowerShell 5.0 or higher)
-function Extract-ZIPFiles_SystemIO {
+
+function extractZIPFileSystemIO {
+    param (
+        [System.IO.FileInfo]$zipFile,
+        [string]$extractPath
+    )
+    if($zipFile -and $extractPath){
+        [System.IO.Compression.ZipFile]::ExtractToDirectory($zipFile.FullName, $extractPath)
+    } else {throw "Filename or Extraction Path is invalid"}
+}
+
+function extractZipFileShellApp {
+    param (
+        [System.IO.FileInfo]$zipFile,
+        [string]$outputFolder
+    )
+    # Extract the ZIP file using Shell.Application
+    $zipFolder = $shellApp.NameSpace($zipFile.FullName)
+    $destinationFolder = $shellApp.NameSpace($outputFolder)
+    $destinationFolder.CopyHere($zipFolder.Items(), 16)  # 16 is the option for 'No Progress Display'
+
+}
+
+function WriteProgressBar {
+    param (
+        [string]$actionText,
+        [string]$zipFileName,
+        [int]$progressCounter,
+        [int]$totalArchives
+    )
+    if ($actionText -and $zipFileName -and $progressCounter -and $totalArchives) {
+        $progressPercentage = ($progressCounter / $totalArchives) * 100
+    
+        # Format the progress bar
+        $progressBar = '[{0}{1}]' -f ('=' * [Math]::Floor($progressPercentage / 10)), (' ' * (10 - [Math]::Floor($progressPercentage / 10)))
+        Write-Host ("{0,-25}: {1,-60} {2,6:F2}% {3} {4}/{5}" -f $actionText, $zipFile.Name, $progressPercentage, $progressBar, $progressCounter, $totalArchives)
+    }
+}
+function extractZIPFiles {
     param (
         [string]$sourceFolder,
         [string]$outputFolder
@@ -29,41 +67,54 @@ function Extract-ZIPFiles_SystemIO {
         # Initialize a variable to store the user-selected action for future duplicates
         $applyActionToFuture = $null
 
+        if (-not $powerShellVerion -ge 5) {
+            # Create a Shell.Application object to work with ZIP files
+            $shellApp = New-Object -ComObject Shell.Application
+        }
+
         # Iterate through each ZIP file and extract its contents to the output folder
         foreach ($zipFile in $zipFiles) {
             # Update the counter and calculate the extraction progress as a percentage
             $progressCounter++
-            $progressPercentage = ($progressCounter / $totalArchives) * 100
-
-            # Format the progress bar
-            $progressBar = '[{0}{1}]' -f ('=' * [Math]::Floor($progressPercentage / 10)), (' ' * (10 - [Math]::Floor($progressPercentage / 10)))
 
             # Extract the ZIP file
             $extractPath = Join-Path -Path $outputFolder -ChildPath $zipFile.BaseName
             if (-not (Test-Path -Path $extractPath)) {
-                [System.IO.Compression.ZipFile]::ExtractToDirectory($zipFile.FullName, $extractPath)
-                Write-Host ("Extracting: {0,-60} {1,5:F2}% {2}" -f $zipFile.Name, $progressPercentage, $progressBar)
+                if ($powerShellVerion -ge 5) {
+                    extractZIPFileSystemIO -zipFile $zipFile -extractPath $extractPath
+                    WriteProgressBar -actionText 'Extracting'-zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
+                } else {
+                    extractZipFileShellApp -zipFile $zipFile -outputFolder $outputFolder
+                    WriteProgressBar -actionText 'Extracting (Fallback Shell)' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
+                }
             } else {
-                if (-not $applyActionToFuture) {
+                if ($applyActionToFuture -notmatch 'Y') {
                     do {
-                        $action = Read-Host "Duplicate found: '$($zipFile.Name)' already exists in the output folder. Choose an action (O)verwrite, (S)kip, (R)ename (by appending copy #):"
+                        $action = Read-Host "Duplicate found:`n'$($zipFile.Name)' already exists in the output folder.`nChoose an action (O)verwrite, (S)kip, (R)ename (by appending copy #)"
                     } while ($action -notin 'O', 'S', 'R')
 
-                    do {
-                        # Ask the user if they want to apply this action to all future duplicates
-                        $applyActionToFuture = Read-Host "Apply this action to all future duplicates? (Y/N)"
-                    } while ($applyActionToFuture -notin 'Y', 'N')
+                    if ($applyActionToFuture -notmatch 'D'){
+                        do {
+                            # Ask the user if they want to apply this action to all future duplicates
+                            $applyActionToFuture = Read-Host "Apply this action to all future duplicates?`n(Y)es, (N)o, (D)No Don't Ask Again)"
+                        } while ($applyActionToFuture -notin 'Y', 'N', 'D')
+                    }
                 }
 
-                if ($applyActionToFuture) {
+                if ($applyActionToFuture -in 'Y', 'D' -and $action) {
                     switch ($action.ToUpper()) {
                         'O' {
                             Get-ChildItem $extractPath | Remove-Item -Force
-                            [System.IO.Compression.ZipFile]::ExtractToDirectory($zipFile.FullName, $extractPath)
-                            Write-Host ("Extracting: {0,-60} {1,5:F2}% {2}" -f $zipFile.Name, $progressPercentage, $progressBar)
+                            if ($powerShellVerion -ge 5) {
+                                extractZIPFileSystemIO -zipFile $zipFile -extractPath $extractPath
+                                WriteProgressBar -actionText 'Extracting & Overwriting' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
+                            } else {
+                                extractZipFileShellApp -zipFile $zipFile -outputFolder $outputFolder
+                                WriteProgressBar -actionText 'Extracting & Overwriting (Fallback Shell)' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
+                            }
                         }
                         'S' {
-                            Write-Host "Skipped $($zipFile.Name)."
+                            WriteProgressBar -actionText 'Skipping Extraction' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
                         }
                         'R' {
                             $copyNumber = 1
@@ -71,54 +122,47 @@ function Extract-ZIPFiles_SystemIO {
                                 $copyNumber++
                                 $extractPath = Join-Path -Path $outputFolder -ChildPath "$($zipFile.BaseName) (Copy $copyNumber)"
                             }
-                            [System.IO.Compression.ZipFile]::ExtractToDirectory($zipFile.FullName, $extractPath)
-                            Write-Host ("Extracting: {0,-60} {1,5:F2}% {2}" -f $zipFile.Name, $progressPercentage, $progressBar)
+                            if ($powerShellVerion -ge 5) {
+                                extractZIPFileSystemIO -zipFile $zipFile -extractPath $extractPath
+                                WriteProgressBar -actionText 'Extracting & Renaming' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
+                            } else {
+                                extractZipFileShellApp -zipFile $zipFile -outputFolder $outputFolder
+                                WriteProgressBar -actionText 'Extracting & Renaming (Fallback Shell)' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
+                            }
                         }
+                    }
+                    if ($applyActionToFuture -eq 'D') {
+                        $action = $null
                     }
                 }
             }
         }
     } catch {
         Write-Error "Failed to extract $($zipFile.Name). Error: $_"
+    } finally {
+        # Release the Shell.Application COM object when done
+        if ($shellApp -ne $null) {
+            [System.Runtime.Interopservices.Marshal]::ReleaseComObject($shellApp) | Out-Null
+        }
     }
 }
 
-# Function to extract ZIP files using Shell.Application (Fallback for PowerShell versions < 5.0)
-function Extract-ZIPFiles_ShellApplication {
-    param (
-        [string]$sourceFolder,
-        [string]$outputFolder
-    )
+function main {
+    # Prompt the user for the source folder and set default as .\
+    $defaultSourceFolder = ".\"
+    $sourceFolder = Read-Host "Enter the source folder path (default: $defaultSourceFolder)"
+    if ([string]::IsNullOrEmpty($sourceFolder)) {
+        $sourceFolder = $defaultSourceFolder
+    }
 
-    # Fallback to using Shell.Application for ZIP file extraction
-    $shell = New-Object -ComObject Shell.Application
+    # Prompt the user for the destination folder and set default as .\extracted
+    $defaultOutputFolder = ".\extracted"
+    $outputFolder = Read-Host "Enter the destination folder path (default: $defaultOutputFolder)"
+    if ([string]::IsNullOrEmpty($outputFolder)) {
+        $outputFolder = $defaultOutputFolder
+    }
 
-    # ... (The remaining code for ZIP extraction using Shell.Application goes here)
-
-    # For the sake of this example, the Shell.Application method is not implemented. You can refer to the previous version of the script for the implementation.
-
-    Write-Warning "The current PowerShell version does not support [System.IO.Compression.ZipFile]. Fallback to Shell.Application is not implemented in this example."
+    extractZIPFiles -sourceFolder $sourceFolder -outputFolder $outputFolder
 }
 
-# Prompt the user for the source folder and set default as .\
-$defaultSourceFolder = ".\"
-$sourceFolder = Read-Host "Enter the source folder path (default: $defaultSourceFolder)"
-if ([string]::IsNullOrEmpty($sourceFolder)) {
-    $sourceFolder = $defaultSourceFolder
-}
-
-# Prompt the user for the destination folder and set default as .\extracted
-$defaultOutputFolder = ".\extracted"
-$outputFolder = Read-Host "Enter the destination folder path (default: $defaultOutputFolder)"
-if ([string]::IsNullOrEmpty($outputFolder)) {
-    $outputFolder = $defaultOutputFolder
-}
-
-# Check PowerShell version and call the appropriate function for ZIP file extraction
-if ($PSVersionTable.PSVersion.Major -ge 5) {
-    # Use [System.IO.Compression.ZipFile] for ZIP extraction
-    Extract-ZIPFiles_SystemIO -sourceFolder $sourceFolder -outputFolder $outputFolder
-} else {
-    # Fallback to using Shell.Application for ZIP extraction
-    Extract-ZIPFiles_ShellApplication -sourceFolder $sourceFolder -outputFolder $outputFolder
-}
+main
