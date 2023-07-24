@@ -1,6 +1,6 @@
 # Win_Mass_Extractor - PowerShell Script to Simplify Extracting Multiple ZIP Archives
 
-![Win_Mass_Extractor](https://link.to.your.image)
+![Win_Mass_Extractor](https://github.com/Nibble-A-Bit/Win_Mass_Extractor/blob/main/Usage%20Video.mp4)
 
 ## Overview
 
