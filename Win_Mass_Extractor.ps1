@@ -1,8 +1,18 @@
 # Win_Mass_Extractor - PowerShell Script to Simplify Extracting Multiple ZIP Archives
 
 # Function to extract ZIP files using [System.IO.Compression.ZipFile] (PowerShell 5.0 or higher)
+function CanIUse-SystemIO {
+    try {
+        # Check if System.IO.Compression.ZipFile is available by attempting to load the assembly
+        [void][Reflection.Assembly]::LoadWithPartialName("System.IO.Compression.FileSystem")
+        $zipFileAvailable = $true
+    } catch {
+        $zipFileAvailable = $false
+    }
 
-function extractZIPFileSystemIO {
+    return $zipFileAvailable
+}
+function Extract-ZIPFilesystemIO {
     param (
         [System.IO.FileInfo]$zipFile,
         [string]$extractPath
@@ -12,7 +22,7 @@ function extractZIPFileSystemIO {
     } else {throw "Filename or Extraction Path is invalid"}
 }
 
-function extractZipFileShellApp {
+function Extract-ZIPFileShellApp {
     param (
         [System.IO.FileInfo]$zipFile,
         [string]$extractPath,
@@ -36,7 +46,7 @@ function extractZipFileShellApp {
 
 }
 
-function WriteProgressBar {
+function Write-ProgressBar {
     param (
         [string]$actionText,
         [string]$zipFileName,
@@ -51,7 +61,7 @@ function WriteProgressBar {
         Write-Host ("{0,-25}: {1,-60} {2,6:F2}% {3} {4}/{5}" -f $actionText, $zipFile.Name, $progressPercentage, $progressBar, $progressCounter, $totalArchives)
     }
 }
-function extractZIPFiles {
+function Extract-ZIPFiles {
     param (
         [string]$sourceFolder,
         [string]$outputFolder
@@ -69,8 +79,8 @@ function extractZIPFiles {
 
         # Initialize a variable to store the user-selected action for future duplicates
         $applyActionToFuture = $null
-
-        if (-not $powerShellVersion -ge 5) {
+        $systemIOAvail = CanIUse-SystemIO
+        if (-not $systemIOAvail) {
             # Create a Shell.Application object to work with ZIP files
             $shellApp = New-Object -ComObject Shell.Application
             # Verify that the Shell.Application object was created successfully
@@ -88,12 +98,12 @@ function extractZIPFiles {
             # Extract the ZIP file
             $extractPath = Join-Path -Path $outputFolder -ChildPath $zipFile.BaseName
             if (-not (Test-Path -Path $extractPath)) {
-                if ($powerShellVersion -ge 5) {
-                    extractZIPFileSystemIO -zipFile $zipFile -extractPath $extractPath
-                    WriteProgressBar -actionText 'Extracting'-zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
+                if ($systemIOAvail) {
+                    Extract-ZIPFilesystemIO -zipFile $zipFile -extractPath $extractPath
+                    Write-ProgressBar -actionText 'Extracting'-zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
                 } else {
-                    extractZipFileShellApp -zipFile $zipFile -extractPath $extractPath -shellApp $shellApp
-                    WriteProgressBar -actionText 'Extracting (Fallback Shell)' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
+                    Extract-ZIPFileShellApp -zipFile $zipFile -extractPath $extractPath -shellApp $shellApp
+                    Write-ProgressBar -actionText 'Extracting (Fallback Shell)' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
                 }
             } else {
                 if ($applyActionToFuture -notmatch 'Y') {
@@ -113,16 +123,16 @@ function extractZIPFiles {
                     switch ($action.ToUpper()) {
                         'O' {
                             Get-ChildItem $extractPath | Remove-Item -Recurse -Force
-                            if ($powerShellVersion -ge 5) {
-                                extractZIPFileSystemIO -zipFile $zipFile -extractPath $extractPath
-                                WriteProgressBar -actionText 'Extracting & Overwriting' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
+                            if ($systemIOAvail) {
+                                Extract-ZIPFilesystemIO -zipFile $zipFile -extractPath $extractPath
+                                Write-ProgressBar -actionText 'Extracting & Overwriting' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
                             } else {
-                                extractZipFileShellApp -zipFile $zipFile -extractPath $extractPath -shellApp $shellApp
-                                WriteProgressBar -actionText 'Extracting & Overwriting (Fallback Shell)' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
+                                Extract-ZIPFileShellApp -zipFile $zipFile -extractPath $extractPath -shellApp $shellApp
+                                Write-ProgressBar -actionText 'Extracting & Overwriting (Fallback Shell)' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
                             }
                         }
                         'S' {
-                            WriteProgressBar -actionText 'Skipping Extraction' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
+                            Write-ProgressBar -actionText 'Skipping Extraction' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
                         }
                         'R' {
                             $copyNumber = 1
@@ -130,12 +140,12 @@ function extractZIPFiles {
                                 $copyNumber++
                                 $extractPath = Join-Path -Path $outputFolder -ChildPath "$($zipFile.BaseName) (Copy $copyNumber)"
                             }
-                            if ($powerShellVersion -ge 5) {
-                                extractZIPFileSystemIO -zipFile $zipFile -extractPath $extractPath
-                                WriteProgressBar -actionText 'Extracting & Renaming' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
+                            if ($systemIOAvail) {
+                                Extract-ZIPFilesystemIO -zipFile $zipFile -extractPath $extractPath
+                                Write-ProgressBar -actionText 'Extracting & Renaming' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
                             } else {
-                                extractZipFileShellApp -zipFile $zipFile -extractPath $extractPath -shellApp $shellApp
-                                WriteProgressBar -actionText 'Extracting & Renaming (Fallback Shell)' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
+                                Extract-ZIPFileShellApp -zipFile $zipFile -extractPath $extractPath -shellApp $shellApp
+                                Write-ProgressBar -actionText 'Extracting & Renaming (Fallback Shell)' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
                             }
                         }
                     }
@@ -155,7 +165,7 @@ function extractZIPFiles {
     }
 }
 
-function main {
+function Start-Program {
     # Prompt the user for the source folder and set default as .\
     $defaultSourceFolder = ".\"
     $sourceFolder = Read-Host "Enter the source folder path (default: $defaultSourceFolder)"
@@ -196,7 +206,7 @@ function main {
         return
     }
 
-    extractZIPFiles -sourceFolder $absoluteSourceFolder -outputFolder $absoluteOutputFolder
+    Extract-ZIPFiles -sourceFolder $absoluteSourceFolder -outputFolder $absoluteOutputFolder
 }
 
-main
+Start-Program
