@@ -1,56 +1,83 @@
-# Win_Mass_Extractor
+# Win_Mass_Extractor - PowerShell Script to Simplify Extracting Multiple ZIP Archives
 
-Win_Mass_Extractor is a PowerShell script that simplifies the process of extracting multiple ZIP archives to a single folder recursively. With this script, you can quickly and efficiently extract the contents of all ZIP files within a specified source folder and its subfolders into a designated output folder.
+![Win_Mass_Extractor](https://link.to.your.image)
+
+## Overview
+
+Win_Mass_Extractor is a PowerShell script designed to simplify the process of extracting multiple ZIP archives in a given folder and its subfolders. The script leverages the [System.IO.Compression.ZipFile] class available in PowerShell 5.0 or higher to perform the extraction. If the required class is not available, the script falls back to using the Shell.Application COM object to achieve the same functionality.
 
 ## Features
 
-- Recursive extraction of ZIP archives from a source folder and its subfolders.
-- Overwrite prompt with options to overwrite, overwrite all, skip, or rename files (by appending copy #).
-- Text-based progress bar displaying extraction progress for each archive.
-- Ability to handle duplicate files with customizable actions.
-- Automatic creation of the output folder if it does not exist.
+- Extracts multiple ZIP archives in a folder and its subfolders.
+- Utilizes [System.IO.Compression.ZipFile] for faster extraction (PowerShell 5.0 or higher).
+- Falls back to Shell.Application COM object if [System.IO.Compression.ZipFile] is not available.
+- Provides user interaction options for handling duplicate ZIP files.
+- Displays a progress bar during the extraction process.
 
-## Requirements
+## Prerequisites
 
-- Windows operating system.
-- PowerShell version 5.1 or higher.
+- PowerShell 5.0 or higher.
 
-## Usage
+## How to Use
 
-1. Place the Win_Mass_Extractor.ps1 script in a convenient location on your system.
+1. Clone or download the repository to your local machine.
 
-2. Open a PowerShell terminal and navigate to the folder where you placed the script.
+2. Open a PowerShell terminal.
 
-3. Run the script by entering the following powershell command (ensure you are in the same directory as the script): .\Win_Mass_Extractor.ps1
+3. Change the directory to the location of the script file.
 
+4. Run the script using the following command:
 
-4. The script will prompt you for the source directory and destination directory.
+   ```
+   .\Win_Mass_Extractor.ps1
+   ```
 
-5. Optionally, you can press Enter without entering a path to use the default values: `.\` for the source directory and `.\extracted` for the destination directory.
+5. The script will prompt you for the source folder path. Enter the path to the folder containing the ZIP archives you want to extract. If no input is provided, the default source folder is set to the current directory (.\).
 
-6. The script will then process all ZIP files in the specified source directory and its subfolders, displaying progress updates as each archive is extracted.
+6. Next, the script will prompt you for the destination folder path. Enter the path where you want the extracted files to be stored. If no input is provided, the default destination folder is set to .\extracted.
 
-7. For any duplicate files encountered during extraction, the script will prompt you to choose an action: overwrite, overwrite all, skip, or rename the file.
+7. The script will then process all the ZIP archives found in the source folder and its subfolders. It will extract the contents to the specified destination folder.
 
-## Caveats and Tips
+8. If the script encounters duplicate ZIP files in the destination folder, it will prompt you to choose an action:
+   - O: Overwrite the existing files.
+   - S: Skip the extraction for the current ZIP archive.
+   - R: Rename the current ZIP archive before extraction.
 
-- Ensure you have the necessary permissions to read from the source directory and write to the destination directory.
+   You can also choose to apply the selected action to all future duplicates.
 
-- Be cautious when using the "Overwrite All" option, as it will overwrite all files without further prompts.
+## Progress Bar
 
-- The script currently supports only ZIP file extraction. If you need to handle other archive formats, you may need to modify the script accordingly.
+During the extraction process, the script displays a progress bar indicating the progress of the extraction. The progress bar shows the percentage of completion for the entire extraction operation.
 
-- Remember that extracting large archives or a large number of archives may take time, depending on your system's performance.
+## Example
 
-- If you encounter any errors during extraction, ensure that the ZIP files are not corrupted and that you have the required permissions.
-
-- Before running the script on important data, consider testing it on a small subset of files to ensure it behaves as expected.
-
-## Disclaimer
-
-This script is provided as-is, without any warranties or guarantees. Use it at your own risk. The author is not responsible for any data loss or damages caused by using this script.
+```powershell
+PS C:\Projects\Win_Mass_Extractor> .\Win_Mass_Extractor.ps1
+Enter the source folder path (default: .\): C:\Projects\ZIP_Archives
+Enter the destination folder path (default: .\extracted): C:\Projects\Extracted_Files
+Confirmed PowerShell 5.V
+[Duplicating Files      ] archive1.zip                                      25.00% [====      ] 1/4
+[Extracting             ] archive2.zip                                      50.00% [========  ] 2/4
+[Skipping Extraction    ] archive3.zip                                      75.00% [==========] 3/4
+[Extracting & Overwriting (Fallback Shell)] archive4.zip                    100.00% [==========] 4/4
+```
 
 ## License
 
-Win_Mass_Extractor is open-source and distributed under the [MIT License](LICENSE). Feel free to modify and use the script according to your needs.
+This project is licensed under the [MIT License](https://opensource.org/licenses/MIT).
 
+## Contributions
+
+Contributions to the project are welcome. If you find any issues or have suggestions for improvements, feel free to create a pull request or submit an issue.
+
+## Disclaimer
+
+This script is provided as-is, without any warranty or guarantee of any kind. The author is not responsible for any damage caused by the usage of this script.
+
+## Credits
+
+This script was created by https://github.com/KR34T1V and inspired by https://chat.openai.com/.
+
+---
+
+Thank you for using Win_Mass_Extractor! If you have any questions or feedback, please don't hesitate to reach out. Happy extracting!
