@@ -15,11 +15,23 @@ function extractZIPFileSystemIO {
 function extractZipFileShellApp {
     param (
         [System.IO.FileInfo]$zipFile,
-        [string]$outputFolder
+        [string]$extractPath,
+        [object]$shellApp
     )
+
+     # Verify that $extractPath is not null or empty
+     if ([string]::IsNullOrEmpty($extractPath)) {
+        Write-Warning "Output folder path is invalid or empty."
+        return
+    }
+    
+    # Verify that the output folder exists or create it if it doesn't
+    if (-not (Test-Path -Path $extractPath -PathType Container)) {
+        New-Item -ItemType Directory -Path $extractPath -ErrorAction Stop | Out-Null
+    }
     # Extract the ZIP file using Shell.Application
     $zipFolder = $shellApp.NameSpace($zipFile.FullName)
-    $destinationFolder = $shellApp.NameSpace($outputFolder)
+    $destinationFolder = $shellApp.NameSpace($extractPath)
     $destinationFolder.CopyHere($zipFolder.Items(), 16)  # 16 is the option for 'No Progress Display'
 
 }
@@ -46,19 +58,10 @@ function extractZIPFiles {
     )
 
     try {
-        # Verify that the source folder exists before proceeding
-        if (-not (Test-Path -Path $sourceFolder -PathType Container)) {
-            Write-Warning "Source folder '$sourceFolder' not found."
-            return
-        }
-
-        # Verify that the output folder exists or create it if it doesn't
-        if (-not (Test-Path -Path $outputFolder -PathType Container)) {
-            New-Item -ItemType Directory -Path $outputFolder -ErrorAction Stop | Out-Null
-        }
-
         # Get all ZIP files in the source folder and its subfolders
         $zipFiles = Get-ChildItem -Path $sourceFolder -Filter "*.zip" -Recurse
+        $powerShellVersion  = $PSVersionTable.PSVersion.Major
+        Write-Host ("Confirmed PowerShell {0}.V" -f $powerShellVersion)
 
         # Initialize the counter and calculate the total number of archives
         $totalArchives = $zipFiles.Count
@@ -67,9 +70,14 @@ function extractZIPFiles {
         # Initialize a variable to store the user-selected action for future duplicates
         $applyActionToFuture = $null
 
-        if (-not $powerShellVerion -ge 5) {
+        if (-not $powerShellVersion -ge 5) {
             # Create a Shell.Application object to work with ZIP files
             $shellApp = New-Object -ComObject Shell.Application
+            # Verify that the Shell.Application object was created successfully
+            if ($null -eq $shellApp) {
+                Write-Warning "Failed to create Shell.Application object."
+                return
+    }
         }
 
         # Iterate through each ZIP file and extract its contents to the output folder
@@ -80,11 +88,11 @@ function extractZIPFiles {
             # Extract the ZIP file
             $extractPath = Join-Path -Path $outputFolder -ChildPath $zipFile.BaseName
             if (-not (Test-Path -Path $extractPath)) {
-                if ($powerShellVerion -ge 5) {
+                if ($powerShellVersion -ge 5) {
                     extractZIPFileSystemIO -zipFile $zipFile -extractPath $extractPath
                     WriteProgressBar -actionText 'Extracting'-zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
                 } else {
-                    extractZipFileShellApp -zipFile $zipFile -outputFolder $outputFolder
+                    extractZipFileShellApp -zipFile $zipFile -extractPath $extractPath -shellApp $shellApp
                     WriteProgressBar -actionText 'Extracting (Fallback Shell)' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
                 }
             } else {
@@ -104,12 +112,12 @@ function extractZIPFiles {
                 if ($applyActionToFuture -in 'Y', 'D' -and $action) {
                     switch ($action.ToUpper()) {
                         'O' {
-                            Get-ChildItem $extractPath | Remove-Item -Force
-                            if ($powerShellVerion -ge 5) {
+                            Get-ChildItem $extractPath | Remove-Item -Recurse -Force
+                            if ($powerShellVersion -ge 5) {
                                 extractZIPFileSystemIO -zipFile $zipFile -extractPath $extractPath
                                 WriteProgressBar -actionText 'Extracting & Overwriting' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
                             } else {
-                                extractZipFileShellApp -zipFile $zipFile -outputFolder $outputFolder
+                                extractZipFileShellApp -zipFile $zipFile -extractPath $extractPath -shellApp $shellApp
                                 WriteProgressBar -actionText 'Extracting & Overwriting (Fallback Shell)' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
                             }
                         }
@@ -122,11 +130,11 @@ function extractZIPFiles {
                                 $copyNumber++
                                 $extractPath = Join-Path -Path $outputFolder -ChildPath "$($zipFile.BaseName) (Copy $copyNumber)"
                             }
-                            if ($powerShellVerion -ge 5) {
+                            if ($powerShellVersion -ge 5) {
                                 extractZIPFileSystemIO -zipFile $zipFile -extractPath $extractPath
                                 WriteProgressBar -actionText 'Extracting & Renaming' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
                             } else {
-                                extractZipFileShellApp -zipFile $zipFile -outputFolder $outputFolder
+                                extractZipFileShellApp -zipFile $zipFile -extractPath $extractPath -shellApp $shellApp
                                 WriteProgressBar -actionText 'Extracting & Renaming (Fallback Shell)' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
                             }
                         }
@@ -138,7 +146,7 @@ function extractZIPFiles {
             }
         }
     } catch {
-        Write-Error "Failed to extract $($zipFile.Name). Error: $_"
+        Write-Warning "Failed to extract $($zipFile.Name). $_"
     } finally {
         # Release the Shell.Application COM object when done
         if ($shellApp -ne $null) {
@@ -154,6 +162,13 @@ function main {
     if ([string]::IsNullOrEmpty($sourceFolder)) {
         $sourceFolder = $defaultSourceFolder
     }
+    if (Test-Path -Path $sourceFolder -PathType Container) {
+        # Convert the $sourceFolder to an absolute path
+        $absoluteSourceFolder = Convert-Path $sourceFolder
+    } else {
+        Write-Warning "Unable to verify source path!"
+        return    
+    }
 
     # Prompt the user for the destination folder and set default as .\extracted
     $defaultOutputFolder = ".\extracted"
@@ -161,8 +176,27 @@ function main {
     if ([string]::IsNullOrEmpty($outputFolder)) {
         $outputFolder = $defaultOutputFolder
     }
+    # Verify that the source folder exists before proceeding
+    if (-not (Test-Path -Path $sourceFolder -PathType Container)) {
+        Write-Warning "Source folder '$sourceFolder' not found."
+        return
+    }
 
-    extractZIPFiles -sourceFolder $sourceFolder -outputFolder $outputFolder
+    # Verify that the output folder exists or create it if it doesn't
+    if (-not (Test-Path -Path $outputFolder -PathType Container)) {
+        New-Item -ItemType Directory -Path $outputFolder -ErrorAction Stop | Out-Null
+    }
+
+    if (Test-Path -Path $outputFolder -PathType Container) {
+        # Convert the $outputFolder to an absolute path
+        $absoluteOutputFolder = Convert-Path $outputFolder
+    } else {
+        Write-Warning "Unable to verify destination path!"
+        $absoluteOutputFolder = Convert-Path $outputFolder
+        return
+    }
+
+    extractZIPFiles -sourceFolder $absoluteSourceFolder -outputFolder $absoluteOutputFolder
 }
 
 main
