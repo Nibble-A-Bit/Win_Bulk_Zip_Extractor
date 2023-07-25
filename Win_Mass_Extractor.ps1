@@ -85,7 +85,7 @@ function Extract-ZIPFiles {
             $shellApp = New-Object -ComObject Shell.Application
             # Verify that the Shell.Application object was created successfully
             if ($null -eq $shellApp) {
-                Write-Warning "Failed to create Shell.Application object."
+                Write-Warning "Failed to create Shell.Application object. $_"
                 return
     }
         }
@@ -97,62 +97,67 @@ function Extract-ZIPFiles {
 
             # Extract the ZIP file
             $extractPath = Join-Path -Path $outputFolder -ChildPath $zipFile.BaseName
-            if (-not (Test-Path -Path $extractPath)) {
-                if ($systemIOAvail) {
-                    Extract-ZIPFilesystemIO -zipFile $zipFile -extractPath $extractPath
-                    Write-ProgressBar -actionText 'Extracting'-zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
+            try{
+                if (-not (Test-Path -Path $extractPath)) {
+                    if ($systemIOAvail) {
+                        Extract-ZIPFilesystemIO -zipFile $zipFile -extractPath $extractPath
+                        Write-ProgressBar -actionText 'Extracting'-zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
+                    } else {
+                        Extract-ZIPFileShellApp -zipFile $zipFile -extractPath $extractPath -shellApp $shellApp
+                        Write-ProgressBar -actionText 'Extracting (Fallback Shell)' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
+                    }
                 } else {
-                    Extract-ZIPFileShellApp -zipFile $zipFile -extractPath $extractPath -shellApp $shellApp
-                    Write-ProgressBar -actionText 'Extracting (Fallback Shell)' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
-                }
-            } else {
-                if ($applyActionToFuture -notmatch 'Y') {
-                    do {
-                        $action = Read-Host "Duplicate found:`n'$($zipFile.Name)' already exists in the output folder.`nChoose an action (O)verwrite, (S)kip, (R)ename (by appending copy #)"
-                    } while ($action -notin 'O', 'S', 'R')
-
-                    if ($applyActionToFuture -notmatch 'D'){
+                    if ($applyActionToFuture -notmatch 'Y') {
                         do {
-                            # Ask the user if they want to apply this action to all future duplicates
-                            $applyActionToFuture = Read-Host "Apply this action to all future duplicates?`n(Y)es, (N)o, (D)No Don't Ask Again)"
-                        } while ($applyActionToFuture -notin 'Y', 'N', 'D')
-                    }
-                }
+                            $action = Read-Host "Duplicate found:`n'$($zipFile.Name)' already exists in the output folder.`nChoose an action (O)verwrite, (S)kip, (R)ename (by appending copy #)"
+                        } while ($action -notin 'O', 'S', 'R')
 
-                if ($applyActionToFuture -in 'Y', 'D' -and $action) {
-                    switch ($action.ToUpper()) {
-                        'O' {
-                            Get-ChildItem $extractPath | Remove-Item -Recurse -Force
-                            if ($systemIOAvail) {
-                                Extract-ZIPFilesystemIO -zipFile $zipFile -extractPath $extractPath
-                                Write-ProgressBar -actionText 'Extracting & Overwriting' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
-                            } else {
-                                Extract-ZIPFileShellApp -zipFile $zipFile -extractPath $extractPath -shellApp $shellApp
-                                Write-ProgressBar -actionText 'Extracting & Overwriting (Fallback Shell)' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
-                            }
-                        }
-                        'S' {
-                            Write-ProgressBar -actionText 'Skipping Extraction' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
-                        }
-                        'R' {
-                            $copyNumber = 1
-                            while (Test-Path -Path $extractPath) {
-                                $copyNumber++
-                                $extractPath = Join-Path -Path $outputFolder -ChildPath "$($zipFile.BaseName) (Copy $copyNumber)"
-                            }
-                            if ($systemIOAvail) {
-                                Extract-ZIPFilesystemIO -zipFile $zipFile -extractPath $extractPath
-                                Write-ProgressBar -actionText 'Extracting & Renaming' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
-                            } else {
-                                Extract-ZIPFileShellApp -zipFile $zipFile -extractPath $extractPath -shellApp $shellApp
-                                Write-ProgressBar -actionText 'Extracting & Renaming (Fallback Shell)' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
-                            }
+                        if ($applyActionToFuture -notmatch 'D'){
+                            do {
+                                # Ask the user if they want to apply this action to all future duplicates
+                                $applyActionToFuture = Read-Host "Apply this action to all future duplicates?`n(Y)es, (N)o, (D)No Don't Ask Again)"
+                            } while ($applyActionToFuture -notin 'Y', 'N', 'D')
                         }
                     }
-                    if ($applyActionToFuture -eq 'D') {
-                        $action = $null
+
+                    if ($applyActionToFuture -in 'Y', 'D' -and $action) {
+                        switch ($action.ToUpper()) {
+                            'O' {
+                                Get-ChildItem $extractPath | Remove-Item -Recurse -Force
+                                if ($systemIOAvail) {
+                                    Extract-ZIPFilesystemIO -zipFile $zipFile -extractPath $extractPath
+                                    Write-ProgressBar -actionText 'Extracting & Overwriting' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
+                                } else {
+                                    Extract-ZIPFileShellApp -zipFile $zipFile -extractPath $extractPath -shellApp $shellApp
+                                    Write-ProgressBar -actionText 'Extracting & Overwriting (Fallback Shell)' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
+                                }
+                            }
+                            'S' {
+                                Write-ProgressBar -actionText 'Skipping Extraction' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
+                            }
+                            'R' {
+                                $copyNumber = 1
+                                while (Test-Path -Path $extractPath) {
+                                    $copyNumber++
+                                    $extractPath = Join-Path -Path $outputFolder -ChildPath "$($zipFile.BaseName) (Copy $copyNumber)"
+                                }
+                                if ($systemIOAvail) {
+                                    Extract-ZIPFilesystemIO -zipFile $zipFile -extractPath $extractPath
+                                    Write-ProgressBar -actionText 'Extracting & Renaming' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
+                                } else {
+                                    Extract-ZIPFileShellApp -zipFile $zipFile -extractPath $extractPath -shellApp $shellApp
+                                    Write-ProgressBar -actionText 'Extracting & Renaming (Fallback Shell)' -zipFileName $zipFile.Name -progressCounter $progressCounter -totalArchives $totalArchives
+                                }
+                            }
+                        }
+                        if ($applyActionToFuture -eq 'D') {
+                            $action = $null
+                        }
                     }
                 }
+            } catch {
+                Write-Warning "Failed to process archive. $_"
+                continue
             }
         }
     } catch {
