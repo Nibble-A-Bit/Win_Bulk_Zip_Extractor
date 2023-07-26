@@ -1,10 +1,10 @@
-# Win_Mass_Extractor - PowerShell Script to Simplify Extracting Multiple ZIP Archives
+# Win_Bulk_Zip_Extractor - PowerShell Script to Simplify Extracting Multiple ZIP Archives
 
-![Win_Mass_Extractor](https://github.com/Nibble-A-Bit/Win_Mass_Extractor/blob/main/UsageVideo.gif)
+![Win_Bulk_Zip_Extractor](https://github.com/Nibble-A-Bit/Win_Bulk_Zip_Extractor/blob/main/UsageVideo.gif)
 
 ## Overview
 
-Win_Mass_Extractor is a PowerShell script designed to simplify the process of extracting multiple ZIP archives in a given folder and its subfolders. The script leverages the [System.IO.Compression.ZipFile] class available in PowerShell 5.0 or higher to perform the extraction. If the required class is not available, the script falls back to using the Shell.Application COM object to achieve the same functionality.
+Win_Bulk_Zip_Extractor is a PowerShell script designed to simplify the process of extracting multiple ZIP archives in a given folder and its subfolders. The script leverages the [System.IO.Compression.ZipFile] class available in PowerShell 5.0 or higher to perform the extraction. If the required class is not available, the script falls back to using the Shell.Application COM object to achieve the same functionality.
 
 ## Features
 
@@ -29,7 +29,7 @@ Win_Mass_Extractor is a PowerShell script designed to simplify the process of ex
 4. Run the script using the following command:
 
    ```
-   .\Win_Mass_Extractor.ps1
+   .\Win_Bulk_Zip_Extractor.ps1
    ```
 
 5. The script will prompt you for the source folder path. Enter the path to the folder containing the ZIP archives you want to extract. If no input is provided, the default source folder is set to the current directory (.\).
@@ -52,7 +52,7 @@ During the extraction process, the script displays a progress bar indicating the
 ## Example
 
 ```powershell
-PS C:\Projects\Win_Mass_Extractor> .\Win_Mass_Extractor.ps1
+PS C:\Projects\Win_Bulk_Zip_Extractor> .\Win_Bulk_Zip_Extractor.ps1
 Enter the source folder path (default: .\): C:\Projects\ZIP_Archives
 Enter the destination folder path (default: .\extracted): C:\Projects\Extracted_Files
 Confirmed PowerShell 5.V
@@ -80,4 +80,4 @@ This script was created by https://github.com/KR34T1V and inspired by https://ch
 
 ---
 
-Thank you for using Win_Mass_Extractor! If you have any questions or feedback, please don't hesitate to reach out. Happy extracting!
+Thank you for using Win_Bulk_Zip_Extractor! If you have any questions or feedback, please don't hesitate to reach out. Happy extracting!
